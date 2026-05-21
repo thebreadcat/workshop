@@ -516,17 +516,99 @@ def queue_update_tasks(app_path: Path, plan: dict):
         tp.write_text(text)
 
 def verify_app_html(app_path: Path) -> list:
-    """Run tortoise HTML validation on built app."""
+    """Run tortoise HTML + JS validation on built app."""
     t = load_tortoise()
     html = app_path / "index.html"
     if not t or not html.exists():
         return []
-    validate = getattr(t, "validate_html_content", None)
-    if not validate:
-        return []
     content = html.read_text(encoding="utf-8", errors="replace")
-    return [msg for level, msg in validate(content, "VERIFY")
-            if level == "severe"]
+    issues = []
+    validate_html = getattr(t, "validate_html_content", None)
+    if validate_html:
+        issues.extend(msg for level, msg in validate_html(content, "VERIFY")
+                      if level == "severe")
+    validate_js = getattr(t, "validate_js_content", None)
+    if validate_js:
+        issues.extend(msg for level, msg in validate_js(content, "VERIFY")
+                      if level == "severe")
+    return issues
+
+def _brain_acceptance(brain: str) -> list:
+    in_sec, items = False, []
+    for line in brain.split("\n"):
+        if re.match(r"##\s+Acceptance", line, re.I):
+            in_sec = True
+            continue
+        if line.startswith("## ") and in_sec:
+            break
+        if in_sec and line.strip().startswith("- "):
+            items.append(line.strip()[2:].strip())
+    return items
+
+SELF_REVIEW_SYSTEM = """You review finished single-page web apps against acceptance criteria.
+List concrete bugs or missing features only. If everything works, respond with exactly NONE.
+Do not suggest refactors or style tweaks unless they break functionality."""
+
+def self_review_app(app_path: Path, cfg: dict) -> list:
+    """One model pass over the finished app; returns issue strings or []."""
+    html = app_path / "index.html"
+    brain_path = app_path / ".tortoise" / "BRAIN.md"
+    if not html.exists() or not cfg.get("endpoint") or not cfg.get("model"):
+        return []
+    brain = (brain_path.read_text(encoding="utf-8", errors="replace")
+             if brain_path.exists() else "")
+    acceptance = _brain_acceptance(brain)
+    if not acceptance:
+        summary = _brain_field(brain, "What this project is") or "App works as described in BRAIN"
+        acceptance = [summary, "All interactive features work; data persists after refresh"]
+    content = html.read_text(encoding="utf-8", errors="replace")
+    crit = "\n".join(f"- {a}" for a in acceptance[:12])
+    prompt = (
+        f"ACCEPTANCE CRITERIA (must all pass):\n{crit}\n\n"
+        f"PROJECT BRAIN (excerpt):\n{brain[:2500]}\n\n"
+        f"COMPLETE index.html:\n{content[:12000]}\n\n"
+        "List bugs or missing features. One per line after ISSUES: "
+        "If everything works, respond with exactly: NONE"
+    )
+    try:
+        resp = call_llm(cfg, [{"role": "user", "content": prompt}],
+                        max_tokens=600, system=SELF_REVIEW_SYSTEM)
+    except Exception:
+        return []
+    text = resp.strip()
+    if re.match(r"^NONE\b", text, re.I) and "ISSUES:" not in text.upper():
+        return []
+    issues = []
+    in_issues = False
+    for line in text.split("\n"):
+        if re.match(r"^ISSUES:\s*", line, re.I):
+            in_issues = True
+            rest = re.sub(r"^ISSUES:\s*", "", line, flags=re.I).strip()
+            if rest and rest.upper() != "NONE":
+                issues.append(rest.lstrip("- ").strip())
+            continue
+        if in_issues:
+            t = line.strip().lstrip("- ").strip()
+            if t and t.upper() != "NONE":
+                issues.append(t)
+    if not issues and text and text.upper() != "NONE":
+        for line in text.split("\n"):
+            t = line.strip().lstrip("- ").strip()
+            if t and len(t) > 8 and t.upper() != "NONE":
+                issues.append(t)
+    return issues[:6]
+
+def inject_review_tasks(app_path: Path, issues: list):
+    tp = app_path / ".tortoise" / "TODO.md"
+    if not tp.exists() or not issues:
+        return
+    block = "".join(
+        f"- [ ] Fix index.html — {i[:95]}\n" for i in issues[:5]
+    )
+    text = tp.read_text()
+    if "Fix index.html —" not in text:
+        text = text.replace("## NEXT\n", f"## NEXT\n{block}", 1)
+        tp.write_text(text)
 
 def inject_verify_task(app_path: Path, issues: list):
     tp = app_path / ".tortoise" / "TODO.md"
@@ -678,6 +760,7 @@ def _run_build(app_path: str, cfg: dict, session: str):
         _emit(session, {"t": "status", "msg": "Starting build..."})
 
         verify_passes = 0
+        review_passes = 0
         last_lines = []
         for iteration in range(30):  # safety cap
             chk = subprocess.run([sys.executable, ts, "status"],
@@ -689,6 +772,15 @@ def _run_build(app_path: str, cfg: dict, session: str):
                     _emit(session, {"t": "status", "msg": "Quality check found issues — fixing…"})
                     inject_verify_task(ap, issues)
                     continue
+                if review_passes < 2:
+                    _emit(session, {"t": "status", "msg": "Reviewing finished app…"})
+                    review_issues = self_review_app(ap, cfg)
+                    if review_issues:
+                        review_passes += 1
+                        _emit(session, {"t": "status",
+                                         "msg": f"Review found {len(review_issues)} issue(s) — fixing…"})
+                        inject_review_tasks(ap, review_issues)
+                        continue
                 _emit(session, {"t": "done", "msg": "Your app is ready!"})
                 _build_state["status"] = "done"
                 return
@@ -720,7 +812,7 @@ def _run_build(app_path: str, cfg: dict, session: str):
                     _emit(session, {"t": "status", "msg": line[:120]})
                 if msg and msg["t"] == "error":
                     chunk_failed = True
-                    if "HTML check" in msg["msg"] or "Write blocked" in msg["msg"]:
+                    if any(k in msg["msg"] for k in ("HTML check", "JS check", "Write blocked")):
                         _emit(session, {"t": "status",
                                          "msg": "Incomplete output — queuing a fix step…"})
                         replace_now_task(

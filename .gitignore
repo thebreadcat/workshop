@@ -1,6 +1,7 @@
 # Tortoise is a separate repo — never commit a copy here
 tortoise.py
 tortoise_impl.py
+vendor/
 
 # Secrets (real config lives in ~/.workshop/config.json)
 .env

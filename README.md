@@ -2,7 +2,7 @@
 
 Natural-language app builder powered by [Tortoise](https://github.com/thebreadcat/tortoise) — a chunk-based harness for local LLMs.
 
-**Zero dependencies** beyond Python 3.10+ stdlib. Tortoise is **not** included in this repo; add it via git (submodule or sibling clone).
+**Zero dependencies** beyond Python 3.10+ stdlib. Tortoise is **not** bundled in this repo — install it yourself (sibling clone, local `vendor/`, or `TORTOISE_PATH`).
 
 ## Requirements
 
@@ -12,21 +12,14 @@ Natural-language app builder powered by [Tortoise](https://github.com/thebreadca
 
 ## Setup
 
-### Option A — Git submodule (recommended)
+### Option A — Local `vendor/` clone (optional, not tracked by git)
 
 ```bash
 git clone https://github.com/thebreadcat/workshop.git
 cd workshop
-git submodule add https://github.com/thebreadcat/tortoise.git vendor/tortoise
-git submodule update --init --recursive
+git clone https://github.com/thebreadcat/tortoise.git vendor/tortoise
 python3 workshop.py
 # Open http://localhost:7700
-```
-
-After cloning Workshop with submodules already configured:
-
-```bash
-git clone --recurse-submodules https://github.com/thebreadcat/workshop.git
 ```
 
 ### Option B — Sibling directories
