@@ -1,0 +1,42 @@
+Tortoise License
+
+Copyright (c) 2026 thebreadcat
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, merge, publish, and distribute the Software, subject to the
+restrictions below.
+
+RESTRICTIONS — YOU MAY NOT:
+
+1. Sell the Software, or copies or substantial portions of it, for money or
+   other valuable consideration.
+
+2. Offer paid support for the Software. This includes charging a fee for
+   installation, configuration, troubleshooting, maintenance, training,
+   consulting, or any similar service where the primary value delivered is
+   support for or operation of the Tortoise codebase itself.
+
+PERMITTED USES
+
+Without limiting the above restrictions, you may:
+
+- Use the Software for any purpose, including in commercial projects, as long
+  as you do not monetize the Tortoise codebase itself under Restrictions 1–2.
+- Modify the Software and share those modifications at no charge, provided
+  this license text is included with all copies or substantial portions.
+
+CONDITIONS
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+DISCLAIMER
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

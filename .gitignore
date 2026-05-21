@@ -1,0 +1,29 @@
+# Tortoise is a separate repo — never commit a copy here
+tortoise.py
+tortoise_impl.py
+
+# Secrets (real config lives in ~/.workshop/config.json)
+.env
+.env.*
+*.pem
+*.key
+**/config.local.json
+
+# Tortoise state inside any app dirs under this tree
+**/.tortoise/config.json
+**/.tortoise/backups/
+**/.tortoise/CURRENT.md
+**/.tortoise/STOP
+
+# Python
+__pycache__/
+*.py[cod]
+.Python
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp

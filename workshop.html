@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Workshop</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #f5f4f0;
+  --surface:  #ffffff;
+  --border:   #e4e2dc;
+  --text:     #1c1b18;
+  --muted:    #787570;
+  --accent:   #2a6049;
+  --accent-l: #eaf2ee;
+  --accent-d: #1e4535;
+  --warn:     #b84040;
+  --warn-l:   #fdf0f0;
+  --r:        14px;
+  --r-sm:     8px;
+  --shadow:   0 2px 12px rgba(0,0,0,0.08);
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* ── screens ──────────────────────────────────────────────────────────────── */
+.screen { display: none; flex-direction: column; min-height: 100vh; }
+.screen.active { display: flex; }
+
+/* ── header ─────────────────────────────────────────────────────────────────── */
+.header {
+  padding: 20px 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.wordmark { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -0.3px; }
+.header-btn {
+  background: none; border: 1px solid var(--border); border-radius: 20px;
+  padding: 6px 14px; font-size: 14px; color: var(--muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.header-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── cards / surfaces ────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  padding: 24px;
+  margin: 16px 20px 0;
+  box-shadow: var(--shadow);
+}
+.card h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.card p  { color: var(--muted); font-size: 15px; }
+
+/* ── buttons ─────────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 13px 22px; border-radius: 10px; font-size: 16px;
+  font-weight: 600; border: none; cursor: pointer; transition: all 0.15s;
+  text-decoration: none; gap: 6px;
+}
+.btn-primary {
+  background: var(--accent); color: #fff;
+}
+.btn-primary:hover  { background: var(--accent-d); }
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-secondary {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-ghost {
+  background: none; color: var(--muted); border: none;
+  padding: 8px 12px; font-size: 14px;
+}
+.btn-ghost:hover { color: var(--accent); }
+
+.btn-danger {
+  background: none; color: var(--warn); border: 1px solid var(--border);
+  font-size: 14px; padding: 8px 14px;
+}
+.btn-danger:hover { border-color: var(--warn); background: var(--warn-l); }
+
+.btn-full { width: 100%; margin-top: 12px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+
+/* ── inputs ──────────────────────────────────────────────────────────────────── */
+.input {
+  width: 100%; padding: 13px 16px; border: 1px solid var(--border);
+  border-radius: 10px; font-size: 16px; background: var(--surface);
+  color: var(--text); outline: none; transition: border 0.15s;
+  font-family: inherit;
+}
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-l); }
+
+/* ── ─────────────── SETUP SCREEN ─────────────────────────────────────────── */
+#s-setup { padding: 40px 20px; gap: 16px; justify-content: center; }
+
+.setup-title {
+  font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 4px;
+}
+.setup-sub { color: var(--muted); font-size: 16px; }
+
+.model-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.model-option {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; border: 1px solid var(--border);
+  border-radius: 10px; cursor: pointer; transition: all 0.15s;
+  background: var(--surface);
+}
+.model-option:hover { border-color: var(--accent); background: var(--accent-l); }
+.model-option.selected { border-color: var(--accent); background: var(--accent-l); }
+.model-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.model-info { flex: 1; }
+.model-name { font-weight: 600; font-size: 15px; }
+.model-source { font-size: 13px; color: var(--muted); }
+
+.manual-toggle { font-size: 14px; color: var(--muted); text-align: center; cursor: pointer; }
+.manual-toggle:hover { color: var(--accent); }
+.manual-section { display: none; flex-direction: column; gap: 8px; }
+.manual-section.open { display: flex; }
+.input-label { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 2px; }
+
+.detecting { color: var(--muted); font-size: 15px; text-align: center; padding: 20px 0; }
+.detecting-dots::after {
+  content: ""; animation: dots 1.2s steps(4, end) infinite;
+}
+@keyframes dots {
+  0%  { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+
+/* ── ──────────────── IDENTIFY SCREEN ────────────────────────────────────── */
+#s-identify { padding: 40px 20px; justify-content: center; gap: 12px; }
+#s-identify .big-q { font-size: 26px; font-weight: 800; letter-spacing: -0.4px; }
+
+/* ── ─────────────────── CHAT SCREEN ─────────────────────────────────────── */
+#s-chat { padding-bottom: 100px; }
+
+.editing-banner {
+  margin: 0 20px 12px; padding: 12px 16px;
+  background: var(--accent-l); border: 1px solid #c5dfd0;
+  border-radius: var(--r-sm); font-size: 14px; color: var(--accent-d);
+  display: none;
+}
+.editing-banner.visible { display: block; }
+.editing-banner strong { font-weight: 700; }
+.editing-banner button {
+  margin-left: 8px; background: none; border: none;
+  color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+
+.chat-body {
+  flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 12px;
+}
+
+.msg { display: flex; flex-direction: column; gap: 4px; }
+
+.bubble {
+  padding: 12px 16px; border-radius: 18px; font-size: 16px; max-width: 85%;
+  line-height: 1.45;
+}
+.bubble-ws {
+  background: var(--surface); border: 1px solid var(--border);
+  border-bottom-left-radius: 4px; align-self: flex-start;
+}
+.bubble-user {
+  background: var(--accent); color: #fff;
+  border-bottom-right-radius: 4px; align-self: flex-end;
+}
+
+.plan-card {
+  background: var(--accent-l); border: 1px solid #c5dfd0;
+  border-radius: var(--r); padding: 16px; margin-top: 4px;
+  font-size: 15px;
+}
+.plan-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--accent-d); }
+.plan-card ul { margin: 8px 0 12px 18px; color: var(--text); }
+.plan-card li { margin-bottom: 4px; }
+.plan-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+.thinking-bubble {
+  display: flex; align-items: center; gap: 6px; color: var(--muted);
+  font-size: 14px; padding: 10px 16px;
+}
+
+.choices {
+  display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 4px;
+}
+.choice-btn {
+  padding: 9px 18px; border: 1.5px solid var(--accent); border-radius: 20px;
+  background: none; color: var(--accent); font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.choice-btn:hover { background: var(--accent); color: #fff; }
+.choice-btn:active { transform: scale(0.96); }
+
+.chat-input-bar {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px;
+  padding: 12px 16px; background: var(--bg);
+  border-top: 1px solid var(--border);
+  display: flex; gap: 8px; align-items: flex-end;
+}
+.chat-input {
+  flex: 1; padding: 11px 16px; border: 1.5px solid var(--border);
+  border-radius: 24px; font-size: 16px; background: var(--surface);
+  color: var(--text); outline: none; resize: none; max-height: 120px;
+  font-family: inherit; transition: border 0.15s; line-height: 1.4;
+}
+.chat-input:focus { border-color: var(--accent); }
+.send-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--accent); color: #fff; border: none;
+  cursor: pointer; font-size: 20px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.send-btn:hover   { background: var(--accent-d); }
+.send-btn:active  { transform: scale(0.92); }
+.send-btn:disabled { background: var(--border); cursor: not-allowed; transform: none; }
+
+/* ── ──────────────── BUILDING SCREEN ────────────────────────────────────── */
+#s-building { padding: 30px 20px; gap: 8px; }
+
+.building-title { font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
+.building-sub   { color: var(--muted); font-size: 15px; margin-bottom: 8px; }
+
+.step-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.step-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 15px; padding: 4px 0;
+}
+.step-icon { width: 22px; flex-shrink: 0; text-align: center; margin-top: 1px; }
+.step-done  .step-icon { color: var(--accent); }
+.step-doing .step-icon { animation: spin 1s linear infinite; display: inline-block; }
+.step-text  { flex: 1; }
+.step-done  .step-text { color: var(--text); }
+.step-doing .step-text { color: var(--accent); font-weight: 600; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.thinking-row {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--muted); font-size: 14px; padding: 8px 0;
+}
+.thinking-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted); animation: blink 1s ease-in-out infinite;
+}
+.thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+/* ── ─────────────────── DONE SCREEN ─────────────────────────────────────── */
+#s-done { padding: 30px 20px; gap: 12px; align-items: stretch; }
+.done-icon  { font-size: 48px; }
+.done-title { font-size: 26px; font-weight: 800; letter-spacing: -0.4px; }
+.done-sub   { color: var(--muted); font-size: 16px; }
+
+.code-toggle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 14px; color: var(--muted); cursor: pointer;
+  padding: 8px 0; border: none; background: none;
+}
+.code-toggle:hover { color: var(--accent); }
+.code-toggle svg { transition: transform 0.2s; }
+.code-toggle.open svg { transform: rotate(90deg); }
+
+.code-panel {
+  display: none; flex-direction: column; gap: 8px;
+  background: #1a1917; border-radius: var(--r); padding: 16px;
+  overflow: hidden;
+}
+.code-panel.open { display: flex; }
+
+.file-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.file-tab {
+  padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  border: 1px solid #333; color: #aaa; background: none; cursor: pointer;
+}
+.file-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.code-content {
+  font-family: "SF Mono", "Fira Code", monospace; font-size: 12px;
+  color: #d4d0c8; line-height: 1.6; overflow-x: auto; white-space: pre;
+  max-height: 280px; overflow-y: auto;
+}
+
+/* ── ─────────────── LIBRARY SCREEN ──────────────────────────────────────── */
+#s-library { padding-bottom: 20px; }
+.lib-header { padding: 20px 20px 0; display: flex; align-items: center; gap: 12px; }
+.back-btn {
+  background: none; border: none; color: var(--accent); font-size: 16px;
+  cursor: pointer; padding: 4px 0; display: flex; align-items: center; gap: 4px;
+  font-weight: 600;
+}
+.lib-title { font-size: 22px; font-weight: 800; }
+
+.app-cards { padding: 12px 20px; display: flex; flex-direction: column; gap: 10px; }
+.app-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 18px; box-shadow: var(--shadow);
+}
+.app-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.app-card-name { font-size: 17px; font-weight: 700; }
+.app-badge {
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+  background: var(--accent-l); color: var(--accent); white-space: nowrap;
+}
+.app-card-desc { color: var(--muted); font-size: 14px; margin-top: 4px; }
+.app-card-meta { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.app-card-actions {
+  display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
+}
+
+.no-apps {
+  text-align: center; color: var(--muted); padding: 60px 20px; font-size: 16px;
+}
+
+/* ── misc ─────────────────────────────────────────────────────────────────── */
+.spacer { flex: 1; }
+.divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+.error-msg { color: var(--warn); font-size: 14px; padding: 8px 0; }
+.notice {
+  background: var(--accent-l); border: 1px solid #c5dfd0;
+  border-radius: var(--r-sm); padding: 12px 14px; font-size: 14px;
+  color: var(--accent-d);
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── SETUP ── -->
+  <div id="s-setup" class="screen">
+    <div class="setup-title">Workshop</div>
+    <div class="setup-sub">Let's get you set up in a few steps.</div>
+
+    <div id="detect-status" class="detecting">Checking for local AI models<span class="detecting-dots"></span></div>
+    <div id="detect-results" style="display:none">
+      <div style="font-weight:600; font-size:15px; margin-bottom:8px;">Found models — pick one:</div>
+      <div class="model-list" id="model-list"></div>
+    </div>
+    <div id="no-detect" style="display:none">
+      <div class="notice">No local models found. Add your API endpoint below, or
+        <strong>set up Ollama</strong> and restart.</div>
+    </div>
+
+    <div style="text-align:center; margin:4px 0;">
+      <span class="manual-toggle" onclick="toggleManual()">Enter endpoint manually ▾</span>
+    </div>
+    <div class="manual-section" id="manual-section">
+      <div>
+        <div class="input-label">API Endpoint URL</div>
+        <input class="input" id="setup-endpoint" placeholder="http://localhost:11434/v1" />
+      </div>
+      <div>
+        <div class="input-label">Model name</div>
+        <input class="input" id="setup-model" placeholder="phi3  or  gpt-4o  etc." />
+      </div>
+      <div>
+        <div class="input-label">API Key (leave blank for local)</div>
+        <input class="input" id="setup-apikey" type="password" placeholder="sk-…  (optional)" />
+      </div>
+    </div>
+
+    <div id="setup-err" class="error-msg" style="display:none"></div>
+    <button class="btn btn-primary btn-full" id="setup-btn" onclick="doSetup()">Continue →</button>
+    <div style="height:20px"></div>
+  </div>
+
+  <!-- ── IDENTIFY ── -->
+  <div id="s-identify" class="screen">
+    <div class="big-q">What's your name?</div>
+    <div style="color:var(--muted); font-size:15px;">Workshop uses this to keep your apps organised.</div>
+    <input class="input" id="name-input" placeholder="Your name" maxlength="30"
+           onkeydown="if(event.key==='Enter') doIdentify()" />
+    <button class="btn btn-primary" onclick="doIdentify()">Let's go →</button>
+  </div>
+
+  <!-- ── CHAT ── -->
+  <div id="s-chat" class="screen">
+    <div class="header">
+      <div class="wordmark">Workshop</div>
+      <button class="header-btn" onclick="showLibrary()">My Apps</button>
+    </div>
+    <div class="editing-banner" id="editing-banner"></div>
+    <div class="chat-body" id="chat-body"></div>
+    <div class="chat-input-bar">
+      <textarea class="chat-input" id="chat-input" rows="1"
+        placeholder="Describe your problem or idea…"
+        onkeydown="chatKeydown(event)" oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendChat()">↑</button>
+    </div>
+  </div>
+
+  <!-- ── BUILDING ── -->
+  <div id="s-building" class="screen">
+    <div class="header">
+      <div class="wordmark">Workshop</div>
+    </div>
+    <div style="height:16px"></div>
+    <div class="building-title" id="build-title">Building your app…</div>
+    <div class="building-sub" id="build-sub">This can take a few minutes with a local model.</div>
+    <div class="step-list" id="step-list"></div>
+    <div id="thinking-row" class="thinking-row" style="display:none">
+      <div class="thinking-dot"></div>
+      <div class="thinking-dot"></div>
+      <div class="thinking-dot"></div>
+      <span style="margin-left:2px">Thinking…</span>
+    </div>
+  </div>
+
+  <!-- ── DONE ── -->
+  <div id="s-done" class="screen">
+    <div class="header">
+      <div class="wordmark">Workshop</div>
+      <button class="header-btn" onclick="showLibrary()">My Apps</button>
+    </div>
+    <div style="height:20px"></div>
+    <div class="done-icon">✅</div>
+    <div class="done-title" id="done-title">Your app is ready!</div>
+    <div class="done-sub" id="done-sub"></div>
+    <a class="btn btn-primary" id="open-app-btn" href="#" target="_blank">
+      Open your app →
+    </a>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btn-secondary" style="flex:1" onclick="buildAnother()">Build something else</button>
+    </div>
+    <button class="code-toggle" id="code-toggle" onclick="toggleCode()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M5 2l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      See the code
+    </button>
+    <div class="code-panel" id="code-panel">
+      <div class="file-tabs" id="file-tabs"></div>
+      <pre class="code-content" id="code-content">Loading…</pre>
+    </div>
+  </div>
+
+  <!-- ── LIBRARY ── -->
+  <div id="s-library" class="screen">
+    <div class="lib-header">
+      <button class="back-btn" onclick="showChat()">← Back</button>
+      <div class="lib-title">My Apps</div>
+    </div>
+    <div class="app-cards" id="app-cards">
+      <div class="no-apps">No apps yet — build something!</div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+const S = {
+  user:      localStorage.getItem("ws_user") || null,
+  session:   Math.random().toString(36).slice(2),
+  interview: { messages: [], plan: null, desc: "", scope: "personal", features: "" },
+  editing:   null,
+  build:     { app_name: "", app_path: "", label: "", owner: "", url: null },
+  setup:     { selected: null },
+};
+
+// ── API ────────────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const r = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body:    body ? JSON.stringify(body) : undefined,
+  });
+  return r.json();
+}
+
+// ── Screen management ──────────────────────────────────────────────────────────
+function show(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("s-" + id).classList.add("active");
+  window.scrollTo(0, 0);
+}
+
+// ── Bootstrap ──────────────────────────────────────────────────────────────────
+async function boot() {
+  const cfg = await api("GET", "/api/config");
+  if (!cfg.configured) {
+    show("setup");
+    runDetect();
+    return;
+  }
+  if (!S.user) {
+    show("identify");
+    return;
+  }
+  show("chat");
+  startChat();
+}
+
+// ── Setup ──────────────────────────────────────────────────────────────────────
+async function runDetect() {
+  try {
+    const { models } = await api("GET", "/api/detect");
+    document.getElementById("detect-status").style.display = "none";
+    const list = document.getElementById("model-list");
+    if (models.length === 0) {
+      document.getElementById("no-detect").style.display = "block";
+      return;
+    }
+    document.getElementById("detect-results").style.display = "block";
+    models.forEach(m => {
+      const el = document.createElement("div");
+      el.className = "model-option";
+      el.innerHTML = `<div class="model-dot"></div>
+        <div class="model-info">
+          <div class="model-name">${m.model}</div>
+          <div class="model-source">${m.label}</div>
+        </div>`;
+      el.onclick = () => {
+        document.querySelectorAll(".model-option").forEach(o => o.classList.remove("selected"));
+        el.classList.add("selected");
+        S.setup.selected = m;
+      };
+      list.appendChild(el);
+    });
+    // Auto-select first
+    if (models.length) list.firstChild.click();
+  } catch(e) {
+    document.getElementById("detect-status").textContent = "Could not check for local models.";
+  }
+}
+
+function toggleManual() {
+  const s = document.getElementById("manual-section");
+  s.classList.toggle("open");
+}
+
+async function doSetup() {
+  const btn = document.getElementById("setup-btn");
+  const err = document.getElementById("setup-err");
+  err.style.display = "none";
+  btn.disabled = true; btn.textContent = "Saving…";
+
+  let endpoint, model, api_key;
+  const manualOpen = document.getElementById("manual-section").classList.contains("open");
+
+  if (manualOpen) {
+    endpoint = document.getElementById("setup-endpoint").value.trim();
+    model    = document.getElementById("setup-model").value.trim();
+    api_key  = document.getElementById("setup-apikey").value.trim();
+    if (!endpoint || !model) {
+      err.textContent = "Please fill in endpoint URL and model name.";
+      err.style.display = "block"; btn.disabled = false; btn.textContent = "Continue →"; return;
+    }
+  } else if (S.setup.selected) {
+    endpoint = S.setup.selected.url;
+    model    = S.setup.selected.model;
+    api_key  = "";
+  } else {
+    err.textContent = "Please select a model or enter one manually.";
+    err.style.display = "block"; btn.disabled = false; btn.textContent = "Continue →"; return;
+  }
+
+  await api("POST", "/api/setup", { endpoint, model, api_key });
+  btn.disabled = false; btn.textContent = "Continue →";
+  if (!S.user) { show("identify"); document.getElementById("name-input").focus(); }
+  else         { show("chat"); startChat(); }
+}
+
+// ── Identify ──────────────────────────────────────────────────────────────────
+async function doIdentify() {
+  const name = document.getElementById("name-input").value.trim();
+  if (!name) return;
+  await api("POST", "/api/user", { name });
+  S.user = name;
+  localStorage.setItem("ws_user", name);
+  show("chat");
+  startChat();
+}
+
+// ── Chat (agent-powered planning) ─────────────────────────────────────────────
+function startChat() {
+  clearChat();
+  S.interview = { messages: [], plan: null, desc: "", scope: "personal", features: "" };
+  S.editing = null;
+  updateEditingBanner();
+  const greeting = S.user
+    ? `Hi ${S.user}! Tell me what you'd like help with — a reminder, a list, a tracker, anything. I'll suggest a plan before we build anything.`
+    : "Tell me what you'd like help with. I'll suggest a plan before we build anything.";
+  addBubble("ws", greeting);
+}
+
+function updateEditingBanner() {
+  const el = document.getElementById("editing-banner");
+  if (!S.editing) {
+    el.classList.remove("visible");
+    el.innerHTML = "";
+    return;
+  }
+  el.classList.add("visible");
+  el.innerHTML = `Editing <strong>${esc(S.editing.title || S.editing.name)}</strong> — `
+    + `describe bugs or new features, then confirm the plan. `
+    + `<button type="button" onclick="leaveEditing()">Start fresh instead</button>`;
+}
+
+function leaveEditing() {
+  S.editing = null;
+  S.build.app_path = "";
+  updateEditingBanner();
+  startChat();
+}
+
+async function openAppForEdit(app) {
+  S.session = Math.random().toString(36).slice(2);
+  const { context, error } = await api("GET",
+    `/api/app/${app.owner}/${app.name}/context`);
+  if (error || !context) {
+    alert(error || "Could not load app");
+    return;
+  }
+  S.editing = context;
+  S.build.app_name = context.name;
+  S.build.app_path = context.path;
+  S.build.owner    = context.owner;
+  S.build.url      = context.url || `/apps/${context.owner}/${context.name}/`;
+  S.build.label    = context.title || context.name;
+  S.interview = { messages: [], plan: null, desc: context.summary || "", scope: context.scope || "personal", features: "" };
+  show("chat");
+  clearChat();
+  updateEditingBanner();
+  const greeting = `You're updating **${context.title || context.name}**. `
+    + `What would you like to fix or add? I'll put together a plan before changing any code.`;
+  addBubble("ws", greeting.replace(/\*\*/g, ""));
+  document.getElementById("chat-input").focus();
+}
+
+function clearChat() {
+  document.getElementById("chat-body").innerHTML = "";
+}
+
+function addBubble(who, text, opts = {}) {
+  const body = document.getElementById("chat-body");
+  const msg  = document.createElement("div");
+  msg.className = "msg";
+
+  if (who === "ws") {
+    const b = document.createElement("div");
+    b.className = "bubble bubble-ws";
+    b.textContent = text;
+    msg.appendChild(b);
+
+    if (opts.choices) {
+      const row = document.createElement("div");
+      row.className = "choices";
+      opts.choices.forEach(c => {
+        const btn = document.createElement("button");
+        btn.className = "choice-btn";
+        btn.textContent = c.label;
+        btn.onclick = () => {
+          // disable all choices
+          row.querySelectorAll(".choice-btn").forEach(b => b.disabled = true);
+          addBubble("user", c.label);
+          c.action();
+        };
+        row.appendChild(btn);
+      });
+      msg.appendChild(row);
+    }
+  } else {
+    const b = document.createElement("div");
+    b.className = "bubble bubble-user";
+    b.textContent = text;
+    msg.appendChild(b);
+  }
+
+  body.appendChild(msg);
+  body.scrollTop = body.scrollHeight;
+  return msg;
+}
+
+function chatKeydown(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendChat();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 120) + "px";
+}
+
+function sendChat() {
+  const input = document.getElementById("chat-input");
+  const text  = input.value.trim();
+  if (!text) return;
+  input.value = ""; input.style.height = "auto";
+  document.getElementById("send-btn").disabled = true;
+  addBubble("user", text);
+  agentChat(text);
+}
+
+function showThinking() {
+  const body = document.getElementById("chat-body");
+  const el = document.createElement("div");
+  el.className = "msg thinking-msg";
+  el.innerHTML = `<div class="bubble bubble-ws thinking-bubble">
+    <div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div>
+    <span>Thinking…</span></div>`;
+  body.appendChild(el);
+  body.scrollTop = body.scrollHeight;
+  return el;
+}
+
+async function agentChat(userText) {
+  S.interview.messages.push({ role: "user", content: userText });
+  const thinking = showThinking();
+
+  try {
+    const res = await api("POST", "/api/agent/chat", {
+      messages:     S.interview.messages,
+      user:         S.user || "",
+      app_context:  S.editing || undefined,
+    });
+    thinking.remove();
+
+    if (res.error) {
+      addBubble("ws", "Sorry, I couldn't reach the model: " + res.error);
+      document.getElementById("send-btn").disabled = false;
+      return;
+    }
+
+    S.interview.messages.push({ role: "assistant", content: res.reply });
+    addBubble("ws", res.reply);
+
+    if (res.ready && res.plan) {
+      S.interview.plan = res.plan;
+      S.interview.desc = res.plan.summary || userText;
+      S.interview.scope = res.plan.scope || "personal";
+      S.interview.features = (res.plan.features || []).join("\n");
+      showPlanCard(res.plan);
+    }
+  } catch (e) {
+    thinking.remove();
+    addBubble("ws", "Something went wrong talking to the model. Is it still running?");
+  }
+  document.getElementById("send-btn").disabled = false;
+}
+
+function showPlanCard(plan) {
+  const body = document.getElementById("chat-body");
+  const msg  = document.createElement("div");
+  msg.className = "msg";
+  const changes = (plan.changes || plan.features || []);
+  const items = changes.map(f => `<li>${esc(f)}</li>`).join("");
+  const accept = (plan.acceptance || []).map(a => `<li>${esc(a)}</li>`).join("");
+  const isUpdate = S.editing || plan.update_mode;
+  msg.innerHTML = `
+    <div class="plan-card">
+      <h3>${isUpdate ? "Updates for" : "Proposed"}: ${esc(plan.title || "App")}</h3>
+      <p>${esc(plan.summary || "")}</p>
+      ${items ? `<p><strong>${isUpdate ? "Changes" : "Features"}</strong></p><ul>${items}</ul>` : ""}
+      ${accept ? `<p><strong>We'll verify</strong></p><ul>${accept}</ul>` : ""}
+      <div class="plan-actions">
+        <button class="btn btn-primary" style="padding:10px 18px;font-size:15px" id="plan-build-btn">${isUpdate ? "Apply changes →" : "Build this →"}</button>
+        <button class="btn btn-secondary" style="padding:10px 18px;font-size:15px" id="plan-revise-btn">Change something</button>
+      </div>
+    </div>`;
+  body.appendChild(msg);
+  body.scrollTop = body.scrollHeight;
+  msg.querySelector("#plan-build-btn").onclick = () => {
+    msg.querySelectorAll("button").forEach(b => b.disabled = true);
+    addBubble("user", isUpdate ? "Apply changes" : "Build this");
+    startBuild();
+  };
+  msg.querySelector("#plan-revise-btn").onclick = () => {
+    addBubble("ws", "What would you like to change?");
+    document.getElementById("chat-input").focus();
+  };
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ── Build ──────────────────────────────────────────────────────────────────────
+async function startBuild() {
+  const desc = S.interview.plan?.summary || S.interview.desc;
+  if (!desc) {
+    addBubble("ws", "Tell me what you want to build first.");
+    return;
+  }
+
+  if (S.editing && S.build.app_path) {
+    return startUpdateBuild();
+  }
+
+  // Failed new-app build — resume only if not editing and no fresh plan
+  if (S.build.app_path && !S.editing) {
+    return resumeBuild();
+  }
+
+  closeBuildStream();
+  const res = await api("POST", "/api/build/start", {
+    description: desc,
+    user:        S.user || "",
+    scope:       S.interview.plan?.scope || S.interview.scope,
+    session:     S.session,
+    plan:        S.interview.plan,
+    extra:       { features: S.interview.features, plan: S.interview.plan },
+  });
+
+  if (res.error) {
+    addBubble("ws", "Sorry, something went wrong: " + res.error);
+    document.getElementById("send-btn").disabled = false;
+    return;
+  }
+
+  S.build.app_name = res.app_name;
+  S.build.app_path = res.app_path;
+  S.build.label    = res.label;
+  const scope = S.interview.plan?.scope || S.interview.scope;
+  S.build.owner    = scope === "shared" ? "shared" : (S.user || "");
+  S.build.url      = `/apps/${S.build.owner}/${res.app_name}/`;
+
+  show("building");
+  document.getElementById("build-title").textContent =
+    `Building your ${res.label || "app"}…`;
+  document.getElementById("step-list").innerHTML = "";
+  document.getElementById("build-sub").textContent =
+    "This can take a few minutes with a local model.";
+
+  listenToSSE();
+}
+
+async function startUpdateBuild() {
+  closeBuildStream();
+  S.session = Math.random().toString(36).slice(2);
+  const res = await api("POST", "/api/build/update", {
+    app_path: S.build.app_path,
+    plan:     S.interview.plan,
+    session:  S.session,
+  });
+  if (res.error) {
+    addBubble("ws", "Sorry, something went wrong: " + res.error);
+    return;
+  }
+  show("building");
+  document.getElementById("build-title").textContent =
+    `Updating ${S.editing?.title || S.build.app_name}…`;
+  document.getElementById("step-list").innerHTML = "";
+  document.getElementById("build-sub").textContent =
+    "Applying your changes with Tortoise…";
+  listenToSSE();
+}
+
+let _buildES = null;
+
+function closeBuildStream() {
+  if (_buildES) { _buildES.close(); _buildES = null; }
+}
+
+async function resumeBuild() {
+  if (!S.build.app_path) {
+    addBubble("ws", "No app to resume — confirm a plan and build first.");
+    show("chat");
+    return;
+  }
+  closeBuildStream();
+  S.session = Math.random().toString(36).slice(2);
+  show("building");
+  document.getElementById("step-list").innerHTML = "";
+  document.getElementById("build-sub").textContent = "Resuming build…";
+
+  const res = await api("POST", "/api/build/resume", {
+    app_path: S.build.app_path,
+    session:  S.session,
+  });
+  if (res.error) {
+    addStep("⚠ " + res.error, "error");
+    showBuildActions();
+    return;
+  }
+  listenToSSE();
+}
+
+function showBuildActions() {
+  const list = document.getElementById("step-list");
+  if (list.querySelector(".build-actions")) return;
+  const row = document.createElement("div");
+  row.className = "build-actions";
+  row.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;margin-top:16px";
+  row.innerHTML = `
+    <button class="btn btn-primary retry-btn">Try again</button>
+    <button class="btn btn-secondary back-btn">Back to chat</button>`;
+  row.querySelector(".retry-btn").onclick = () => {
+    row.querySelectorAll("button").forEach(b => b.disabled = true);
+    resumeBuild();
+  };
+  row.querySelector(".back-btn").onclick = () => {
+    closeBuildStream();
+    show("chat");
+    addBubble("ws", "Build paused. You can tap Build this on the plan when ready.");
+  };
+  list.appendChild(row);
+}
+
+function addStep(text, type) {
+  const list = document.getElementById("step-list");
+  // hide thinking
+  document.getElementById("thinking-row").style.display = "none";
+  const row = document.createElement("div");
+  row.className = `step-row step-${type}`;
+  row.innerHTML = `<span class="step-icon">${type === "done" ? "✓" : type === "doing" ? "⟳" : "•"}</span>
+                   <span class="step-text">${text}</span>`;
+  list.appendChild(row);
+  list.scrollTop = list.scrollHeight;
+  window.scrollTo(0, document.body.scrollHeight);
+  return row;
+}
+
+function listenToSSE() {
+  closeBuildStream();
+  const es = new EventSource(`/api/build/stream?session=${S.session}`);
+  _buildES = es;
+  let lastStep = null;
+  let settled  = false;
+
+  es.onmessage = e => {
+    const msg = JSON.parse(e.data);
+
+    if (msg.t === "thinking") {
+      document.getElementById("thinking-row").style.display = "flex";
+    } else if (msg.t === "step") {
+      if (lastStep) {
+        lastStep.className = "step-row step-done";
+        lastStep.querySelector(".step-icon").textContent = "✓";
+      }
+      lastStep = addStep(msg.msg.replace(/^✓\s*/, ""), "done");
+    } else if (msg.t === "ok") {
+      // suppress — already visible as step
+    } else if (msg.t === "status") {
+      document.getElementById("build-sub").textContent = msg.msg;
+    } else if (msg.t === "done") {
+      settled = true;
+      document.getElementById("thinking-row").style.display = "none";
+      closeBuildStream();
+      showDone();
+    } else if (msg.t === "error") {
+      settled = true;
+      document.getElementById("thinking-row").style.display = "none";
+      addStep("⚠ " + msg.msg, "error");
+      closeBuildStream();
+      showBuildActions();
+    }
+  };
+
+  es.onerror = async () => {
+    if (settled) return;
+    closeBuildStream();
+    try {
+      const st = await api("GET", "/api/build/status");
+      if (st.status === "done") {
+        settled = true;
+        showDone();
+        return;
+      }
+      if (st.status === "building" || st.status === "starting") {
+        document.getElementById("build-sub").textContent = "Reconnecting…";
+        setTimeout(() => { if (!settled) listenToSSE(); }, 1500);
+        return;
+      }
+    } catch (_) { /* fall through */ }
+    settled = true;
+    addStep("⚠ Lost connection to the build.", "error");
+    showBuildActions();
+  };
+}
+
+// ── Done ──────────────────────────────────────────────────────────────────────
+function showDone() {
+  show("done");
+  document.getElementById("done-title").textContent =
+    `Your ${S.build.label || "app"} is ready!`;
+  document.getElementById("done-sub").textContent =
+    `"${S.build.app_name}" was built in ${document.querySelectorAll(".step-done").length} steps.`;
+
+  const openBtn = document.getElementById("open-app-btn");
+  if (S.build.url) {
+    openBtn.href = S.build.url;
+    openBtn.style.display = "flex";
+  } else {
+    openBtn.style.display = "none";
+  }
+}
+
+function buildAnother() {
+  S.session  = Math.random().toString(36).slice(2);
+  S.build.app_path = "";
+  show("chat");
+  startChat();
+}
+
+// ── Code viewer ───────────────────────────────────────────────────────────────
+let _codeFiles = [], _codeActive = null;
+
+async function toggleCode() {
+  const tog   = document.getElementById("code-toggle");
+  const panel = document.getElementById("code-panel");
+  tog.classList.toggle("open");
+  panel.classList.toggle("open");
+  if (!panel.classList.contains("open")) return;
+
+  if (_codeFiles.length === 0) {
+    // Load file list
+    const { files } = await api("GET",
+      `/api/app/${S.build.owner}/${S.build.app_name}/files`);
+    _codeFiles = files || [];
+    renderFileTabs();
+    if (_codeFiles.length) loadCodeFile(_codeFiles[0]);
+  }
+}
+
+function renderFileTabs() {
+  const tabs = document.getElementById("file-tabs");
+  tabs.innerHTML = "";
+  _codeFiles.forEach(f => {
+    const t = document.createElement("button");
+    t.className = "file-tab" + (f === _codeActive ? " active" : "");
+    t.textContent = f;
+    t.onclick = () => loadCodeFile(f);
+    tabs.appendChild(t);
+  });
+}
+
+async function loadCodeFile(fp) {
+  _codeActive = fp;
+  renderFileTabs();
+  document.getElementById("code-content").textContent = "Loading…";
+  const { content } = await api("GET",
+    `/api/app/${S.build.owner}/${S.build.app_name}/file?path=${encodeURIComponent(fp)}`);
+  document.getElementById("code-content").textContent = content || "";
+}
+
+// ── Library ───────────────────────────────────────────────────────────────────
+async function showLibrary() {
+  show("library");
+  const { apps } = await api("GET", `/api/apps?user=${encodeURIComponent(S.user || "")}`);
+  const cards = document.getElementById("app-cards");
+
+  if (!apps.length) {
+    cards.innerHTML = `<div class="no-apps">No apps yet — build something!</div>`;
+    return;
+  }
+
+  cards.innerHTML = "";
+  apps.forEach(a => {
+    const card = document.createElement("div");
+    card.className = "app-card";
+    const badge = a.scope === "shared"
+      ? `<span class="app-badge">Shared</span>` : "";
+    card.innerHTML = `
+      <div class="app-card-top">
+        <div class="app-card-name">${a.name}</div>
+        ${badge}
+      </div>
+      ${a.desc ? `<div class="app-card-desc">${a.desc}</div>` : ""}
+      ${a.last_used ? `<div class="app-card-meta">Last used: ${a.last_used}</div>` : ""}
+      <div class="app-card-actions">
+        ${a.url ? `<a class="btn btn-primary" style="font-size:14px;padding:8px 16px" href="${a.url}" target="_blank">Open →</a>` : ""}
+        <button class="btn btn-secondary" style="font-size:14px;padding:8px 16px"
+          data-improve="1">Improve</button>
+        <button class="btn btn-danger"
+          onclick="deleteApp('${a.owner}', '${a.name}', this)">Delete</button>
+      </div>`;
+    card.querySelector("[data-improve]").onclick = () => openAppForEdit(a);
+    cards.appendChild(card);
+  });
+}
+
+async function deleteApp(owner, name, btn) {
+  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  btn.disabled = true;
+  await api("DELETE", `/api/apps/${owner}/${name}`);
+  showLibrary();
+}
+
+function showChat() {
+  show("chat");
+  updateEditingBanner();
+}
+
+// ── Start ──────────────────────────────────────────────────────────────────────
+boot();
+</script>
+</body>
+</html>
