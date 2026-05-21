@@ -55,9 +55,8 @@ _tortoise_module = None
 
 TORTOISE_INSTALL_HINT = (
     "Tortoise not found. Install via:\n"
-    "  git submodule add https://github.com/thebreadcat/tortoise.git vendor/tortoise\n"
-    "  git submodule update --init\n"
-    "Or clone https://github.com/thebreadcat/tortoise next to this repo, or set TORTOISE_PATH."
+    "  git clone https://github.com/thebreadcat/tortoise.git vendor/tortoise\n"
+    "Or clone next to this repo as ../tortoise/, or set TORTOISE_PATH."
 )
 
 def _tortoise_candidates():
@@ -547,7 +546,32 @@ def _brain_acceptance(brain: str) -> list:
 
 SELF_REVIEW_SYSTEM = """You review finished single-page web apps against acceptance criteria.
 List concrete bugs or missing features only. If everything works, respond with exactly NONE.
-Do not suggest refactors or style tweaks unless they break functionality."""
+Each issue must start with a dash (-). Do not suggest refactors or style tweaks unless they break functionality."""
+
+_REVIEW_ISSUE_LINE = re.compile(r"^\s*(?:-\s+|\d+\.\s+)(.+)$")
+
+def _parse_review_issues(text: str) -> list:
+    """Parse model review output; only accept dashed or numbered issue lines."""
+    text = text.strip()
+    if re.match(r"^NONE\b", text, re.I) and "ISSUES:" not in text.upper():
+        return []
+    issues, in_issues = [], False
+    for line in text.split("\n"):
+        if re.match(r"^ISSUES:\s*", line, re.I):
+            in_issues = True
+            rest = re.sub(r"^ISSUES:\s*", "", line, flags=re.I).strip()
+            if rest.upper() == "NONE":
+                continue
+            m = _REVIEW_ISSUE_LINE.match(rest)
+            if m:
+                issues.append(m.group(1).strip())
+            elif rest and not rest.endswith(":"):
+                issues.append(rest.lstrip("- ").strip())
+            continue
+        m = _REVIEW_ISSUE_LINE.match(line)
+        if m and (in_issues or not issues):
+            issues.append(m.group(1).strip())
+    return issues[:6]
 
 def self_review_app(app_path: Path, cfg: dict) -> list:
     """One model pass over the finished app; returns issue strings or []."""
@@ -567,7 +591,7 @@ def self_review_app(app_path: Path, cfg: dict) -> list:
         f"ACCEPTANCE CRITERIA (must all pass):\n{crit}\n\n"
         f"PROJECT BRAIN (excerpt):\n{brain[:2500]}\n\n"
         f"COMPLETE index.html:\n{content[:12000]}\n\n"
-        "List bugs or missing features. One per line after ISSUES: "
+        "Respond with ISSUES: then one bug per line starting with '- '. "
         "If everything works, respond with exactly: NONE"
     )
     try:
@@ -575,28 +599,7 @@ def self_review_app(app_path: Path, cfg: dict) -> list:
                         max_tokens=600, system=SELF_REVIEW_SYSTEM)
     except Exception:
         return []
-    text = resp.strip()
-    if re.match(r"^NONE\b", text, re.I) and "ISSUES:" not in text.upper():
-        return []
-    issues = []
-    in_issues = False
-    for line in text.split("\n"):
-        if re.match(r"^ISSUES:\s*", line, re.I):
-            in_issues = True
-            rest = re.sub(r"^ISSUES:\s*", "", line, flags=re.I).strip()
-            if rest and rest.upper() != "NONE":
-                issues.append(rest.lstrip("- ").strip())
-            continue
-        if in_issues:
-            t = line.strip().lstrip("- ").strip()
-            if t and t.upper() != "NONE":
-                issues.append(t)
-    if not issues and text and text.upper() != "NONE":
-        for line in text.split("\n"):
-            t = line.strip().lstrip("- ").strip()
-            if t and len(t) > 8 and t.upper() != "NONE":
-                issues.append(t)
-    return issues[:6]
+    return _parse_review_issues(resp)
 
 def inject_review_tasks(app_path: Path, issues: list):
     tp = app_path / ".tortoise" / "TODO.md"
@@ -621,6 +624,23 @@ def inject_verify_task(app_path: Path, issues: list):
     if task not in text:
         text = text.replace("## NEXT\n", f"## NEXT\n- [ ] {task}\n", 1)
         tp.write_text(text)
+
+def _validation_fix_task(error_msg: str) -> str:
+    """Build a fix task that includes the specific HTML/JS validation failure."""
+    msg = re.sub(r"^✗\s*", "", error_msg.strip())
+    m = re.search(r"(?:HTML|JS) check \([^)]+\):\s*(.+)$", msg, re.I)
+    if m:
+        detail = m.group(1).strip()[:120]
+        return (
+            f"Fix index.html — validation failed: {detail}. "
+            "Output the complete file: all tags closed, every getElementById id "
+            "exists in HTML, localStorage getItem keys have setItem, braces balanced in <script>."
+        )
+    return (
+        "Fix index.html — output was incomplete. Close every open tag "
+        "(</form></main></body></html>), finish any half-written sections, "
+        "and keep all existing content that already works."
+    )
 
 def replace_now_task(app_path: Path, task: str):
     """Replace the active NOW task so a failed chunk does not loop forever."""
@@ -814,13 +834,8 @@ def _run_build(app_path: str, cfg: dict, session: str):
                     chunk_failed = True
                     if any(k in msg["msg"] for k in ("HTML check", "JS check", "Write blocked")):
                         _emit(session, {"t": "status",
-                                         "msg": "Incomplete output — queuing a fix step…"})
-                        replace_now_task(
-                            ap,
-                            "Fix index.html — output was incomplete. Close every open tag "
-                            "(</form></main></body></html>), finish any half-written sections, "
-                            "and keep all existing content that already works.",
-                        )
+                                         "msg": "Validation failed — queuing a targeted fix…"})
+                        replace_now_task(ap, _validation_fix_task(msg["msg"]))
                     else:
                         proc.wait()
                         detail = msg["msg"]
