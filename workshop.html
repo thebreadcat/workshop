@@ -75,6 +75,40 @@ html, body {
 @keyframes toast-in { from { opacity: 0; transform: translateX(-50%) translateY(12px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 
+.notif-panel {
+  display: none;
+  position: fixed;
+  top: 52px;
+  right: max(16px, calc(50% - 224px));
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(420px, 60vh);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  z-index: 900;
+  flex-direction: column;
+  overflow: hidden;
+}
+.notif-panel.open { display: flex; }
+.notif-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  font-weight: 700; font-size: 15px;
+}
+.notif-panel-head .btn-ghost { font-size: 13px; padding: 4px 8px; }
+.notif-list { overflow-y: auto; flex: 1; }
+.notif-item {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.12s;
+}
+.notif-item:hover { background: var(--accent-l); }
+.notif-item:last-child { border-bottom: none; }
+.notif-item-title { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+.notif-item-msg { font-size: 14px; color: var(--muted); line-height: 1.4; }
+.notif-item-meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.notif-empty { padding: 24px 14px; text-align: center; color: var(--muted); font-size: 14px; }
+
 /* ── cards / surfaces ────────────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
@@ -423,7 +457,8 @@ html, body {
     <div class="header">
       <div class="wordmark">Workshop</div>
       <div style="display:flex;gap:8px;align-items:center">
-        <button class="header-btn notif-btn" id="notif-btn" style="position:relative" title="Notifications">🔔
+        <button type="button" class="header-btn notif-btn" id="notif-btn" style="position:relative"
+                title="Notifications" onclick="toggleNotifPanel(event)" aria-expanded="false" aria-haspopup="true">🔔
           <span id="notif-badge" class="notif-badge" style="display:none">0</span>
         </button>
         <button class="header-btn" onclick="showLibrary()">My Apps</button>
@@ -497,6 +532,16 @@ html, body {
 
 </div><!-- #app -->
 
+<div id="notif-panel" class="notif-panel" role="dialog" aria-label="Notifications">
+  <div class="notif-panel-head">
+    <span>Notifications</span>
+    <button type="button" class="btn-ghost" id="notif-mark-all" onclick="markAllNotifsRead()">Mark all read</button>
+  </div>
+  <div id="notif-list" class="notif-list">
+    <div class="notif-empty">No unread notifications</div>
+  </div>
+</div>
+
 <script>
 // ── State ──────────────────────────────────────────────────────────────────────
 const S = {
@@ -520,6 +565,7 @@ async function api(method, path, body) {
 
 // ── Screen management ──────────────────────────────────────────────────────────
 function show(id) {
+  closeNotifPanel();
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   document.getElementById("s-" + id).classList.add("active");
   window.scrollTo(0, 0);
@@ -527,9 +573,90 @@ function show(id) {
 
 let _lastNotifId = 0;
 let _notifPollTimer = null;
+let _notifPanelOpen = false;
 
 function escapeHtml(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function formatNotifTime(createdAt) {
+  if (!createdAt) return "";
+  try {
+    const d = new Date(createdAt.replace("Z", ""));
+    const now = new Date();
+    const mins = Math.floor((now - d) / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  } catch (_) {
+    return createdAt;
+  }
+}
+
+function closeNotifPanel() {
+  const panel = document.getElementById("notif-panel");
+  const btn = document.getElementById("notif-btn");
+  _notifPanelOpen = false;
+  if (panel) panel.classList.remove("open");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+async function toggleNotifPanel(ev) {
+  if (ev) ev.stopPropagation();
+  const panel = document.getElementById("notif-panel");
+  const btn = document.getElementById("notif-btn");
+  if (!panel) return;
+  _notifPanelOpen = !_notifPanelOpen;
+  panel.classList.toggle("open", _notifPanelOpen);
+  if (btn) btn.setAttribute("aria-expanded", _notifPanelOpen ? "true" : "false");
+  if (_notifPanelOpen) await renderNotifPanel();
+}
+
+async function renderNotifPanel() {
+  const listEl = document.getElementById("notif-list");
+  const markAll = document.getElementById("notif-mark-all");
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="notif-empty">Loading…</div>';
+  try {
+    const { notifications } = await api("GET", "/api/notifications?unread=1");
+    const list = notifications || [];
+    if (markAll) markAll.style.display = list.length ? "inline" : "none";
+    if (!list.length) {
+      listEl.innerHTML = '<div class="notif-empty">No unread notifications</div>';
+      return;
+    }
+    listEl.innerHTML = list.map(n => `
+      <div class="notif-item" data-id="${n.id}" role="button" tabindex="0">
+        <div class="notif-item-title">${escapeHtml(n.title || n.app || "Notification")}</div>
+        <div class="notif-item-msg">${escapeHtml(n.message || "")}</div>
+        <div class="notif-item-meta">${escapeHtml(n.app || "")} · ${formatNotifTime(n.created_at)}</div>
+      </div>`).join("");
+    listEl.querySelectorAll(".notif-item").forEach(el => {
+      const open = () => markNotifRead(parseInt(el.dataset.id, 10));
+      el.addEventListener("click", open);
+      el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+    });
+  } catch (_) {
+    listEl.innerHTML = '<div class="notif-empty">Could not load notifications</div>';
+  }
+}
+
+async function markNotifRead(id) {
+  await api("POST", `/api/notifications/${id}/read`);
+  await pollNotifications();
+  if (_notifPanelOpen) await renderNotifPanel();
+}
+
+async function markAllNotifsRead() {
+  try {
+    const { notifications } = await api("GET", "/api/notifications?unread=1");
+    for (const n of (notifications || [])) {
+      await api("POST", `/api/notifications/${n.id}/read`);
+    }
+    await pollNotifications();
+    await renderNotifPanel();
+  } catch (_) {}
 }
 
 function showNotifToast(n) {
@@ -538,9 +665,8 @@ function showNotifToast(n) {
   el.className = "notif-toast";
   el.innerHTML = `<strong>${escapeHtml(n.title || n.app)}</strong>${escapeHtml(n.message || "")}`;
   el.onclick = async () => {
-    await api("POST", `/api/notifications/${n.id}/read`);
+    await markNotifRead(n.id);
     el.remove();
-    pollNotifications();
   };
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 8000);
@@ -555,6 +681,7 @@ async function pollNotifications() {
       badge.style.display = list.length ? "inline" : "none";
       badge.textContent = list.length > 9 ? "9+" : String(list.length);
     }
+    if (_notifPanelOpen) await renderNotifPanel();
     const newest = list[0];
     if (newest && newest.id > _lastNotifId) {
       if (_lastNotifId > 0) showNotifToast(newest);
@@ -567,6 +694,14 @@ function startNotificationPoll() {
   if (_notifPollTimer) return;
   pollNotifications();
   _notifPollTimer = setInterval(pollNotifications, 30000);
+  document.addEventListener("click", e => {
+    if (!_notifPanelOpen) return;
+    const panel = document.getElementById("notif-panel");
+    const btn = document.getElementById("notif-btn");
+    if (panel && !panel.contains(e.target) && btn && !btn.contains(e.target)) {
+      closeNotifPanel();
+    }
+  });
 }
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────────
