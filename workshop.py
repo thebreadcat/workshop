@@ -200,7 +200,7 @@ INTENT_RULES = [
 DATA_API_RULES = [
     "Use the Workshop data API for all persistence — NOT localStorage",
     'APP slug: use the folder name in "## Data app id" from BRAIN.md (e.g. medication-reminder)',
-    'Read:  fetch(`/api/data/${APP}/${key}`).then(r => r.json())',
+    'Read:  getData(key) must return d.value — API shape is {app,key,value}; use: if(!r.ok)return null; return (await r.json()).value',
     'Write: fetch(`/api/data/${APP}/${key}`, {method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify(value)})',
     "Schedules: POST /api/schedules with {id, app, every, at_time, action, message} when user saves reminder times",
 ]
@@ -278,8 +278,8 @@ def todo_tasks(intent: str, stack: str, desc: str, plan: dict = None, app_name: 
         "Add complete CSS in the <style> block — mobile-first, 44px touch targets, forms and lists. "
         "Keep all HTML structure; end with </html>.",
         f"Add <script> with Workshop data API helpers — const APP=\"{slug}\"; "
-        "async getData(k){const r=await fetch(`/api/data/${APP}/${k}`);return r.ok?r.json():null}; "
-        "async putData(k,v){await fetch(`/api/data/${APP}/${k}`,{method:\"PUT\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(v)})}",
+        "async getData(k){{const r=await fetch(`/api/data/${{APP}}/${{k}}`);if(!r.ok)return null;return (await r.json()).value}}; "
+        "async putData(k,v){{await fetch(`/api/data/${{APP}}/${{k}}`,{{method:\"PUT\",headers:{{\"Content-Type\":\"application/json\"}},body:JSON.stringify(v)}})}}",
         "Wire up the UI — forms submit, list renders, mark-done and delete all persist via putData/getData",
         "Add empty state, friendly copy, and polish — match acceptance criteria from BRAIN.md",
         "VERIFY: index.html must be complete (</html> present), all features work, "
