@@ -16,7 +16,10 @@ from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-VERSION              = "0.1.0"
+import workshop_db as db
+import ticker
+
+VERSION              = "0.2.0"
 TORTOISE_MIN_VERSION = "0.2.0"
 DEFAULT_PORT         = 7700
 
@@ -181,6 +184,8 @@ def list_apps(cfg, user=None):
 
 INTENT_RULES = [
     (r"forget|remind|medic|alarm|alert|notif",          "remind",   "Reminder"),
+    (r"invoice|receipt|bill|payment|quote",             "invoice",  "Invoice"),
+    (r"report|summary|export|print",                    "report",   "Report"),
     (r"shop|groceri|\bbuy\b|purchase|\bcart\b|pantry",   "shopping", "Shopping list"),
     (r"todo|task|\blist\b|check|errand|chore",           "todo",     "To-do list"),
     (r"\bchart\b|\bgraph\b|visual|analyt|dashboard",     "chart",    "Dashboard"),
@@ -192,25 +197,42 @@ INTENT_RULES = [
     (r"timer|stopwatch|countdown|\bclock\b|pomodoro",    "timer",    "Timer"),
 ]
 
+DATA_API_RULES = [
+    "Use the Workshop data API for all persistence — NOT localStorage",
+    'APP slug: use the folder name in "## Data app id" from BRAIN.md (e.g. medication-reminder)',
+    'Read:  fetch(`/api/data/${APP}/${key}`).then(r => r.json())',
+    'Write: fetch(`/api/data/${APP}/${key}`, {method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify(value)})',
+    "Schedules: POST /api/schedules with {id, app, every, at_time, action, message} when user saves reminder times",
+]
+
+PRINT_RULES = [
+    "Include a Print / Export button that calls window.print()",
+    "@media print CSS: hide buttons, nav, and input forms; black text on white; A4/Letter fit",
+    "Printed output includes app title and today's date at the top",
+]
+
+SCHEDULE_INTENTS = frozenset({"remind", "timer", "tracker"})
+PRINT_INTENTS    = frozenset({"invoice", "receipt", "report", "todo", "shopping", "tracker"})
+
 STACKS = {
     "html": {
-        "tech":  "Single HTML file, vanilla JS, localStorage",
+        "tech":  "Single HTML file, vanilla JS, Workshop data API (SQLite via fetch)",
         "file":  "index.html",
         "rules": [
             "Single HTML file — no separate JS or CSS files",
-            "Zero external dependencies",
-            "localStorage for all data persistence",
+            "Zero external dependencies (no npm, no CDNs except Chart stack)",
+            *DATA_API_RULES,
             "Mobile-first layout — 390px base, 44px minimum touch targets",
             "Never break existing saved data when the app is updated",
         ],
     },
     "html_chart": {
-        "tech":  "Single HTML file, Chart.js via CDN, localStorage",
+        "tech":  "Single HTML file, Chart.js via CDN, Workshop data API",
         "file":  "index.html",
         "rules": [
             "Single HTML file — no separate JS or CSS files",
             "Chart.js from cdnjs is the only permitted external library",
-            "localStorage for all data persistence",
+            *DATA_API_RULES,
             "Mobile-first layout — 390px base",
         ],
     },
@@ -239,7 +261,7 @@ def slugify(text: str) -> str:
     clean = [w for w in words if w not in stop][:3]
     return "-".join(clean) or "my-app"
 
-def todo_tasks(intent: str, stack: str, desc: str, plan: dict = None) -> list:
+def todo_tasks(intent: str, stack: str, desc: str, plan: dict = None, app_name: str = None) -> list:
     if stack == "python":
         return [
             "Create main.py with argparse CLI, --help text, and usage examples",
@@ -248,20 +270,35 @@ def todo_tasks(intent: str, stack: str, desc: str, plan: dict = None) -> list:
             "Add progress output and a clear completion message",
         ]
     title = (plan or {}).get("title", "the app")
+    slug  = app_name or slugify(desc)
     tasks = [
         f"Create index.html skeleton — doctype, viewport, <title>{title}</title>, "
         "empty <style>, body with <h1> for app name, <main id=\"app-main\">, closing </body></html>. "
         "Under 80 lines. No JavaScript yet.",
         "Add complete CSS in the <style> block — mobile-first, 44px touch targets, forms and lists. "
         "Keep all HTML structure; end with </html>.",
-        "Add <script> with localStorage helpers and data model objects for this app's entities",
-        "Wire up the UI — forms submit, list renders, mark-done and delete all work with localStorage",
+        f"Add <script> with Workshop data API helpers — const APP=\"{slug}\"; "
+        "async getData(k){const r=await fetch(`/api/data/${APP}/${k}`);return r.ok?r.json():null}; "
+        "async putData(k,v){await fetch(`/api/data/${APP}/${k}`,{method:\"PUT\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(v)})}",
+        "Wire up the UI — forms submit, list renders, mark-done and delete all persist via putData/getData",
         "Add empty state, friendly copy, and polish — match acceptance criteria from BRAIN.md",
         "VERIFY: index.html must be complete (</html> present), all features work, "
         "no 'Project Brain' in visible UI, title and h1 match App name",
     ]
     if intent == "chart":
         tasks.insert(3, "Load Chart.js from cdnjs CDN and wire up the chart display")
+    if intent in SCHEDULE_INTENTS:
+        tasks.insert(-1,
+            "Add schedule registration — when user saves times, POST to /api/schedules "
+            f'with app "{slug}", unique id, every (day/weekday/etc), at_time HH:MM, action notify')
+    if intent in PRINT_INTENTS:
+        tasks.insert(-1,
+            "Add Print button (window.print()) and @media print CSS — hide buttons/forms/nav, "
+            "black on white, title and date header on printed page")
+    if intent == "invoice":
+        tasks.insert(-2,
+            "Add business fields (name, address, logo URL) stored via data API; "
+            "printable invoice layout with item table, totals, payment terms")
     return tasks
 
 def make_brain_files(app_name, desc, intent, stack_key, scope, extra):
@@ -283,6 +320,9 @@ def make_brain_files(app_name, desc, intent, stack_key, scope, extra):
 ## Architecture
 {stack['tech']}.
 Main file: {stack['file']}
+
+## Data app id (folder name — use in /api/data/ and /api/schedules calls)
+{app_name}
 
 ## Current State
 Not started.
@@ -306,8 +346,10 @@ Not started.
 
     const  = "# Constitution\n# These rules apply to every single chunk.\n\n"
     const += "\n".join(f"- {r}" for r in stack["rules"]) + "\n"
+    if stack_key.startswith("html") and intent in PRINT_INTENTS:
+        const += "\n".join(f"- {r}" for r in PRINT_RULES) + "\n"
 
-    tasks  = todo_tasks(intent, stack_key, desc, plan)
+    tasks  = todo_tasks(intent, stack_key, desc, plan, app_name=app_name)
     todo   = "## NOW\n[Tortoise moves the active task here]\n\n## NEXT\n"
     todo  += "\n".join(f"- [ ] {t}" for t in tasks)
     todo  += "\n\n## LATER\n\n## BLOCKED\n\n## DONE\n"
@@ -326,7 +368,7 @@ Your job:
 Rules:
 - Keep replies short (2-4 sentences) unless explaining a plan.
 - One question at a time when clarifying.
-- Recommend simple single-page apps (HTML + localStorage) unless they need a script.
+- Recommend simple single-page apps (HTML + Workshop data API) unless they need a script.
 - Do NOT say you are building yet — the user must confirm the plan first.
 
 When ready to propose a build, put a JSON block at the very END of your message (after your friendly summary).
@@ -352,7 +394,7 @@ Your job:
 Rules:
 - Keep replies short (2-4 sentences) unless explaining the plan.
 - One question at a time when clarifying.
-- Preserve existing behavior and localStorage data unless they want a reset.
+- Preserve existing behavior and saved data (data API) unless they want a reset.
 - Do NOT say you are building yet — they must confirm first.
 
 EXISTING APP:
@@ -501,11 +543,11 @@ def queue_update_tasks(app_path: Path, plan: dict):
     if accept:
         tasks.append(
             "VERIFY: " + "; ".join(str(a) for a in accept[:4])[:200]
-            + " — preserve localStorage data, complete index.html, no regressions"
+            + " — preserve data API / saved data, complete index.html, no regressions"
         )
     else:
         tasks.append(
-            "VERIFY: all requested changes work, localStorage preserved, "
+            "VERIFY: all requested changes work, saved data preserved via data API, "
             "index.html complete with closing tags and working script"
         )
     text = tp.read_text(encoding="utf-8")
@@ -669,6 +711,19 @@ _build_state = {
     "app_path": None,
     "chunk":    0,
 }
+
+def _build_lock_held() -> bool:
+    """True if a build thread currently holds the lock."""
+    if _build_lock.acquire(blocking=False):
+        _build_lock.release()
+        return False
+    return True
+
+def _build_status_snapshot() -> dict:
+    """Status for API — active reflects the lock, not a stale status string."""
+    out = dict(_build_state)
+    out["active"] = _build_lock_held()
+    return out
 _ANSI = re.compile(r"\033\[[0-9;]*m")
 
 def _clean(line: str) -> str:
@@ -687,9 +742,11 @@ def _translate(line: str):
         return {"t": "step", "msg": f"✓ {m.group(1).strip()}"}
     if "Queue empty" in l or "No tasks" in l:
         return {"t": "done", "msg": "Build complete!"}
-    # Real Tortoise errors use ✗ — not diff lines like "+ --error-color: …"
+    # Validation failures are recoverable — not fatal build errors
     stripped = l.lstrip()
     if stripped.startswith("✗"):
+        if any(k in stripped for k in ("HTML check", "JS check", "Write blocked")):
+            return {"t": "status", "msg": stripped.lstrip("✗").strip()}
         return {"t": "error", "msg": stripped}
     if re.search(r"cannot reach|Connection refused|timed out|URLError", l, re.I):
         return {"t": "error", "msg": l}
@@ -824,24 +881,24 @@ def _run_build(app_path: str, cfg: dict, session: str):
                         last_lines.pop(0)
                 msg = _translate(raw)
                 if msg:
-                    _emit(session, msg)
+                    if msg["t"] == "error":
+                        if any(k in msg["msg"] for k in ("HTML check", "JS check", "Write blocked")):
+                            chunk_failed = True
+                            replace_now_task(ap, _validation_fix_task(msg["msg"]))
+                            _emit(session, {"t": "status",
+                                             "msg": "Validation issue — auto-fixing…"})
+                        else:
+                            _emit(session, msg)
+                            proc.wait()
+                            _build_state["status"] = "error"
+                            return
+                    else:
+                        _emit(session, msg)
                 elif line and any(line.startswith(p) for p in (
                     "Running Chunk", "Task:", "Plan:", "Changes", "Written:",
                     "Chunk ", "Calling ",
                 )):
                     _emit(session, {"t": "status", "msg": line[:120]})
-                if msg and msg["t"] == "error":
-                    chunk_failed = True
-                    if any(k in msg["msg"] for k in ("HTML check", "JS check", "Write blocked")):
-                        _emit(session, {"t": "status",
-                                         "msg": "Validation failed — queuing a targeted fix…"})
-                        replace_now_task(ap, _validation_fix_task(msg["msg"]))
-                    else:
-                        proc.wait()
-                        detail = msg["msg"]
-                        _emit(session, {"t": "error", "msg": detail})
-                        _build_state["status"] = "error"
-                        return
             rc = proc.wait()
             if chunk_failed:
                 _build_state["chunk"] += 1
@@ -861,6 +918,8 @@ def _run_build(app_path: str, cfg: dict, session: str):
         _emit(session, {"t": "done", "msg": "Build complete!"})
         _build_state["status"] = "done"
     finally:
+        if _build_state.get("status") == "building":
+            _build_state["status"] = "error"
         _build_lock.release()
 
 # ── HTTP handler ───────────────────────────────────────────────────────────────
@@ -893,11 +952,15 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(n)) if n else {}
 
+    def json_value(self):
+        n = int(self.headers.get("Content-Length", 0))
+        return json.loads(self.rfile.read(n)) if n else None
+
     # CORS preflight
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin",  "*")
-        self.send_header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
@@ -926,8 +989,39 @@ class Handler(BaseHTTPRequestHandler):
                 "configured":     bool(cfg.get("endpoint") and cfg.get("model")),
                 "tortoise_found": bool(tortoise_script()),
                 "tortoise_ver":   tortoise_version(),
+                "ticker_alive":   ticker.ticker_status().get("alive"),
+                "db_path":        str(db.DB_PATH),
             })
             self.js(safe); return
+
+        if p == "/api/notifications":
+            unread = qs.get("unread", ["0"])[0] in ("1", "true", "yes")
+            self.js({"notifications": db.notif_list(unread_only=unread)}); return
+
+        if p == "/api/schedules":
+            app = qs.get("app", [None])[0]
+            self.js({"schedules": db.schedule_list(app=app)}); return
+
+        if re.match(r"^/api/data/[^/]+/[^/]+$", p):
+            app, key = p.split("/")[3], p.split("/")[4]
+            val = db.data_get(app, key)
+            if val is None:
+                self.js({"error": "not found"}, 404)
+            else:
+                self.js({"app": app, "key": key, "value": val})
+            return
+
+        if re.match(r"^/api/data/[^/]+$", p):
+            app = p.split("/")[3]
+            self.js({"app": app, "keys": db.data_list(app)}); return
+
+        if re.match(r"^/api/print/[^/]+/[^/]+$", p):
+            parts = p.split("/")
+            self.send_response(302)
+            self.send_header("Location", f"/apps/{parts[3]}/{parts[4]}/?print=1")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            return
 
         if p == "/api/detect":
             self.js({"models": detect_models()}); return
@@ -937,7 +1031,7 @@ class Handler(BaseHTTPRequestHandler):
             self.js({"apps": list_apps(load_config(), user)}); return
 
         if p == "/api/build/status":
-            self.js(_build_state); return
+            self.js(_build_status_snapshot()); return
 
         if p == "/api/build/stream":
             sid = qs.get("session", ["default"])[0]
@@ -996,11 +1090,47 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/agent/chat":
             self._agent_chat(b); return
 
+        if p == "/api/schedules":
+            try:
+                db.schedule_upsert(b)
+                self.js({"ok": True, "schedules": db.schedule_list(app=b.get("app"))})
+            except ValueError as e:
+                self.js({"error": str(e)}, 400)
+            return
+
+        m = re.match(r"^/api/notifications/(\d+)/read$", p)
+        if m:
+            ok = db.notif_mark_read(int(m.group(1)))
+            self.js({"ok": ok} if ok else {"error": "not found"}, 200 if ok else 404)
+            return
+
+        self.js({"error": "not found"}, 404)
+
+    def do_PUT(self):
+        p = urlparse(self.path).path
+        if re.match(r"^/api/data/[^/]+/[^/]+$", p):
+            app, key = p.split("/")[3], p.split("/")[4]
+            try:
+                value = self.json_value()
+                meta = db.data_put(app, key, value)
+                self.js({"ok": True, **meta})
+            except json.JSONDecodeError:
+                self.js({"error": "invalid JSON body"}, 400)
+            return
         self.js({"error": "not found"}, 404)
 
     # ── DELETE ─────────────────────────────────────────────────────────────────
     def do_DELETE(self):
         parts = urlparse(self.path).path.split("/")
+        if len(parts) >= 5 and parts[2] == "data":
+            app, key = parts[3], parts[4]
+            ok = db.data_delete(app, key)
+            self.js({"ok": ok} if ok else {"error": "not found"}, 200 if ok else 404)
+            return
+        if len(parts) >= 4 and parts[2] == "schedules":
+            ok = db.schedule_delete(parts[3])
+            self.js({"ok": ok} if ok else {"error": "not found"}, 200 if ok else 404)
+            return
         # /api/apps/{owner}/{name}
         if len(parts) >= 5 and parts[2] == "apps":
             owner, name = parts[3], parts[4]
@@ -1156,8 +1286,10 @@ class Handler(BaseHTTPRequestHandler):
             self.js({"error": "app not found"}, 404); return
         if not cfg.get("endpoint") or not cfg.get("model"):
             self.js({"error": "not configured"}, 400); return
-        if _build_state.get("status") == "building":
-            self.js({"error": "build already running"}, 409); return
+        if _build_lock_held():
+            self.js({"error": "build already running", "still_running": True}, 409); return
+        if _build_state.get("status") in ("building", "starting"):
+            _build_state["status"] = "idle"
         append_brain_update(ap, plan)
         queue_update_tasks(ap, plan)
         current = ap / ".tortoise" / "CURRENT.md"
@@ -1179,8 +1311,14 @@ class Handler(BaseHTTPRequestHandler):
             self.js({"error": "app not found"}, 404); return
         if not cfg.get("endpoint") or not cfg.get("model"):
             self.js({"error": "not configured"}, 400); return
-        if _build_state.get("status") == "building":
-            self.js({"error": "build already running"}, 409); return
+        if _build_lock_held():
+            self.js({
+                "ok": True, "still_running": True,
+                "app_path": str(ap), "app_name": ap.name,
+            })
+            return
+        if _build_state.get("status") in ("building", "starting"):
+            _build_state["status"] = "idle"
         _sanitize_todo(ap)
         self._launch_build(ap, ap.name, cfg, sid)
         self.js({"ok": True, "app_path": str(ap), "app_name": ap.name})
@@ -1261,6 +1399,8 @@ def main():
 
     cfg = load_config()
     apps_dir(cfg).mkdir(parents=True, exist_ok=True)
+    db.init_db()
+    ticker.start_ticker_thread(lambda: apps_dir(load_config()))
 
     tv     = tortoise_version()
     ts_ok  = bool(tortoise_script())
@@ -1273,6 +1413,8 @@ def main():
         for line in TORTOISE_INSTALL_HINT.splitlines():
             print(f"    {line}")
     print(f"  apps dir : {apps_dir(cfg)}")
+    print(f"  database : {db.DB_PATH}")
+    print(f"  ticker   : background (60s)")
     print(f"  config   : {CONFIG_FILE}")
     if not cfg.get("endpoint"):
         print(f"\n  ⚠  Not configured yet — open the browser and complete setup.")

@@ -47,6 +47,19 @@ python3 workshop.py
 
 Workshop stores your model endpoint in `~/.workshop/config.json` (may include `api_key`). See [config.example.json](config.example.json). Built apps default to `~/workshop-apps/`.
 
+## Data, schedules, and ticker
+
+One SQLite database at `~/.workshop/workshop.db` (WAL mode) holds app data, notifications, and schedules. New HTML apps persist via the data API (`/api/data/{app}/{key}`), not `localStorage`.
+
+`python3 workshop.py` starts the HTTP server and a background **ticker** (60s) that fires schedules and writes notifications. The Workshop UI polls unread notifications every 30s.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET/PUT/DELETE /api/data/{app}/{key}` | App persistence |
+| `GET/POST/DELETE /api/schedules` | Reminders and automation |
+| `GET /api/notifications?unread=1` | Notification inbox |
+| `GET /api/print/{owner}/{app}` | Opens app with `?print=1` for print mode |
+
 ## Related repo
 
 | Repo | Role |
